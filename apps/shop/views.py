@@ -4,32 +4,56 @@ from rest_framework.response import Response
 from .models import Product, InventoryItem, Order, OrderItem
 from .serializers import ProductSerializer, InventorySerializer, OrderSerializer
 from django.shortcuts import get_object_or_404
-from apps.users.permissions import IsPatient
+from apps.users.permissions import IsPatient, IsStaffUser
+from apps.users.models import User
 
 
-class ProductViewSet(viewsets.ReadOnlyModelViewSet):
+class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-    permission_classes = [permissions.AllowAny]
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated(), IsStaffUser()]
 
 
-class InventoryViewSet(viewsets.ReadOnlyModelViewSet):
+class InventoryViewSet(viewsets.ModelViewSet):
     queryset = InventoryItem.objects.select_related('product').all()
     serializer_class = InventorySerializer
-    permission_classes = [permissions.AllowAny]
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated(), IsStaffUser()]
 
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
-    permission_classes = [permissions.IsAuthenticated, IsPatient]
+
+    def get_permissions(self):
+        return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
-        # patients only see their orders
-        return self.queryset.filter(patient=self.request.user)
+        user = self.request.user
+        if user.role == User.Role.PATIENT:
+            # patients only see their orders
+            return self.queryset.filter(patient=user)
+        # Staff (Pharmacist, Receptionist, Admin) can view all orders
+        return self.queryset
 
     def perform_create(self, serializer):
         serializer.save(patient=self.request.user)
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        if user.role == User.Role.PATIENT:
+            if 'status' in serializer.validated_data:
+                new_status = serializer.validated_data['status']
+                if new_status != Order.CANCELLED:
+                    raise permissions.exceptions.PermissionDenied("Patients can only cancel orders.")
+        serializer.save()
 
     @action(detail=False, methods=['post'])
     def checkout(self, request):

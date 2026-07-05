@@ -83,12 +83,12 @@ export default function ReceptionistDashboard({ user, onLogout }) {
       </header>
 
       {/* Tabs */}
-      <div className="glass-card" style={{ display: 'flex', gap: '8px', padding: '8px', marginBottom: '24px' }}>
-        <button className={`glass-btn ${activeTab === 'queue' ? '' : 'glass-btn-secondary'}`} onClick={() => setActiveTab('queue')}>
-          <Users size={18} /> Patient Check-In & Queue
+      <div className="glass-card" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '8px', marginBottom: '24px' }}>
+        <button className={`glass-btn ${activeTab === 'queue' ? '' : 'glass-btn-secondary'}`} onClick={() => setActiveTab('queue')} title="Patient Check-In &amp; Queue">
+          <Users size={18} /> <span className="cashier-tab-label">Patient Check-In &amp; Queue</span>
         </button>
-        <button className={`glass-btn ${activeTab === 'claims' ? '' : 'glass-btn-secondary'}`} onClick={() => setActiveTab('claims')}>
-          <FileText size={18} /> Insurance Claims
+        <button className={`glass-btn ${activeTab === 'claims' ? '' : 'glass-btn-secondary'}`} onClick={() => setActiveTab('claims')} title="Insurance Claims">
+          <FileText size={18} /> <span className="cashier-tab-label">Insurance Claims</span>
         </button>
       </div>
 

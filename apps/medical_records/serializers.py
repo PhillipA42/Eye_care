@@ -25,14 +25,19 @@ class TriageEntrySerializer(serializers.ModelSerializer):
 
 class VisualAcuityTestSerializer(serializers.ModelSerializer):
     patient_details = UserSerializer(source='patient', read_only=True)
+    requires_review = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = VisualAcuityTest
         fields = [
             'id', 'patient', 'patient_details', 'test_date',
-            'distance_feet', 'od_acuity', 'os_acuity', 'is_self_test', 'device_info'
+            'distance_feet', 'od_acuity', 'os_acuity', 'is_self_test',
+            'device_info', 'requires_review'
         ]
         read_only_fields = ['patient', 'test_date']
+
+    def get_requires_review(self, obj):
+        return obj.od_acuity != '20/20' or obj.os_acuity != '20/20'
 
 
 class MedicationItemSerializer(serializers.ModelSerializer):

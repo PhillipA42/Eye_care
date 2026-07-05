@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.users.models import User, PatientProfile, StaffProfile
+from apps.users.models import User, PatientProfile, StaffProfile, Department, DirectMessage
 
 
 def generate_patient_number():
@@ -26,10 +26,25 @@ class PatientProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ['is_verified']
 
 
+class DepartmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Department
+        fields = [
+            'id', 'code', 'name', 'description',
+            'is_clinical', 'is_active', 'sort_order'
+        ]
+        read_only_fields = fields
+
+
 class StaffProfileSerializer(serializers.ModelSerializer):
+    department_details = DepartmentSerializer(source='department', read_only=True)
+
     class Meta:
         model = StaffProfile
-        fields = ['license_number', 'specialization', 'is_active_staff']
+        fields = [
+            'department', 'department_details',
+            'license_number', 'specialization', 'is_active_staff'
+        ]
         read_only_fields = ['is_active_staff']
 
 
@@ -45,6 +60,49 @@ class UserSerializer(serializers.ModelSerializer):
             'patient_profile', 'staff_profile'
         ]
         read_only_fields = ['role']
+
+
+class UserDirectorySerializer(serializers.ModelSerializer):
+    display_name = serializers.SerializerMethodField()
+    department_name = serializers.CharField(source='staff_profile.department.name', read_only=True, default='')
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'first_name', 'last_name', 'display_name', 'role', 'email', 'department_name']
+
+    def get_display_name(self, obj):
+        return obj.get_full_name() or obj.username
+
+
+class DirectMessageSerializer(serializers.ModelSerializer):
+    sender_details = UserDirectorySerializer(source='sender', read_only=True)
+    recipient_details = UserDirectorySerializer(source='recipient', read_only=True)
+
+    class Meta:
+        model = DirectMessage
+        fields = [
+            'id', 'sender', 'sender_details', 'recipient', 'recipient_details',
+            'body', 'is_read', 'created_at'
+        ]
+        read_only_fields = ['sender', 'is_read', 'created_at']
+
+    def validate_recipient(self, value):
+        request = self.context.get('request')
+        if request and value == request.user:
+            raise serializers.ValidationError("You cannot send a message to yourself.")
+        if not value.is_active:
+            raise serializers.ValidationError("You cannot send a message to an inactive user.")
+        return value
+
+    def validate_body(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Message cannot be empty.")
+        return value
+
+    def create(self, validated_data):
+        request = self.context['request']
+        return DirectMessage.objects.create(sender=request.user, **validated_data)
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):

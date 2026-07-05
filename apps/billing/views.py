@@ -3,9 +3,9 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
-from apps.billing.models import Invoice, InsuranceClaim, InventoryItem, Order
+from apps.billing.models import Invoice, InsuranceClaim, Payment, Receipt
 from apps.billing.serializers import (
-    InvoiceSerializer, InsuranceClaimSerializer, InventoryItemSerializer, OrderSerializer
+    InvoiceSerializer, InsuranceClaimSerializer, PaymentSerializer, ReceiptSerializer
 )
 from apps.users.permissions import IsPatient, IsReceptionist, IsPharmacistOrOptician, IsStaffUser
 from apps.users.models import User
@@ -93,48 +93,13 @@ class InsuranceClaimViewSet(viewsets.ModelViewSet):
         })
 
 
-class InventoryItemViewSet(viewsets.ModelViewSet):
-    """
-    Manage stock levels for meds, lenses, and frames.
-    Pharmacists/Opticians manage; Patients can view.
-    """
-    queryset = InventoryItem.objects.all()
-    serializer_class = InventoryItemSerializer
+class PaymentViewSet(viewsets.ModelViewSet):
+    queryset = Payment.objects.all()
+    serializer_class = PaymentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
-        # Patients can view available frame selections, drops, and lenses
-        return InventoryItem.objects.all()
-
-    def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [IsPharmacistOrOptician()]
-        return [permissions.IsAuthenticated()]
-
-
-class OrderViewSet(viewsets.ModelViewSet):
-    """
-    Handle patient orders (glasses/meds).
-    Patients order; Pharmacists/Opticians fulfill.
-    """
-    queryset = Order.objects.all()
-    serializer_class = OrderSerializer
+class ReceiptViewSet(viewsets.ModelViewSet):
+    queryset = Receipt.objects.all()
+    serializer_class = ReceiptSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
-        user = self.request.user
-        if user.role == User.Role.PATIENT:
-            return Order.objects.filter(patient=user)
-        # Pharmacists & Opticians view all incoming orders to dispense
-        if user.role in [User.Role.PHARMACIST, User.Role.OPTICIAN]:
-            return Order.objects.all()
-        return Order.objects.none()
-
-    def perform_create(self, serializer):
-        serializer.save(patient=self.request.user)
-
-    def get_permissions(self):
-        # Restrict state updates (e.g. shipping/dispensation status changes) to Pharmacist/Optician roles
-        if self.action in ['update', 'partial_update', 'destroy']:
-            return [IsPharmacistOrOptician()]
-        return [permissions.IsAuthenticated()]

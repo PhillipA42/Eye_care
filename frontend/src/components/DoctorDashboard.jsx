@@ -14,7 +14,9 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  ArrowRight
+  ArrowRight,
+  Menu,
+  X
 } from 'lucide-react';
 
 // dynamic overview values will be loaded from the API
@@ -47,8 +49,28 @@ const statusClass = (status) => {
  
 export default function DoctorDashboard({ user, onLogout }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [darkMode, setDarkMode] = useState(false);
+
+  // Auto-collapse on small screens, close overlay on resize up
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 900) {
+        setSidebarCollapsed(true);
+      } else {
+        setMobileOpen(false);
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const handleNavClick = (viewKey) => {
+    setView(viewKey);
+    if (window.innerWidth <= 900) setMobileOpen(false);
+  };
 
   const [overview, setOverview] = useState(defaultOverview);
   const [appointments, setAppointments] = useState(defaultAppointments);
@@ -59,7 +81,9 @@ export default function DoctorDashboard({ user, onLogout }) {
   const [view, setView] = useState('overview'); // 'overview' | 'appointments' | 'slots' | 'queue' | 'patients' | 'records' | 'settings'
 
   const [slots, setSlots] = useState([]);
-  const [newSlot, setNewSlot] = useState({ start_time: '', duration_minutes: 30, slot_type: 'Consultation', capacity: 1, is_virtual: false });
+  const [departments, setDepartments] = useState([]);
+  const [slotTypes, setSlotTypes] = useState([]);
+  const [newSlot, setNewSlot] = useState({ start_time: '', duration_minutes: 30, slot_type: '', department: '', capacity: 1, is_virtual: false });
 
   useEffect(() => {
     if (!user?.id) return;
@@ -113,6 +137,33 @@ export default function DoctorDashboard({ user, onLogout }) {
     load();
   }, [user]);
 
+  useEffect(() => {
+    const loadOptions = async () => {
+      try {
+        const [departmentData, slotTypeData] = await Promise.all([
+          api.getDepartments(),
+          api.getSlotTypes()
+        ]);
+        const clinicalDepartments = Array.isArray(departmentData)
+          ? departmentData.filter(department => department.is_clinical)
+          : [];
+        const types = Array.isArray(slotTypeData) ? slotTypeData : [];
+        const staffDepartment = user?.staff_profile?.department || user?.staff_profile?.department_details?.id || '';
+
+        setDepartments(clinicalDepartments);
+        setSlotTypes(types);
+        setNewSlot(prev => ({
+          ...prev,
+          department: prev.department || String(staffDepartment || clinicalDepartments[0]?.id || ''),
+          slot_type: prev.slot_type || types[0]?.value || ''
+        }));
+      } catch (err) {
+        console.error('Failed loading department options', err);
+      }
+    };
+    loadOptions();
+  }, [user]);
+
   // load doctor's slots separately
   useEffect(() => {
     if (!user?.id) return;
@@ -132,6 +183,7 @@ export default function DoctorDashboard({ user, onLogout }) {
     try {
       const payload = {
         doctor: user.id,
+        department: newSlot.department ? Number(newSlot.department) : null,
         start_time: newSlot.start_time,
         duration_minutes: Number(newSlot.duration_minutes) || 30,
         slot_type: newSlot.slot_type,
@@ -141,7 +193,7 @@ export default function DoctorDashboard({ user, onLogout }) {
       const created = await api.createSlot(payload);
       setSlots(prev => [created, ...prev]);
       alert('Slot created and published for patients to book.');
-      setNewSlot({ start_time: '', duration_minutes: 30, slot_type: 'Consultation', capacity: 1, is_virtual: false });
+      setNewSlot(prev => ({ ...prev, start_time: '', duration_minutes: 30, capacity: 1, is_virtual: false }));
     } catch (err) {
       alert('Failed creating slot: ' + err.message);
     }
@@ -168,7 +220,14 @@ export default function DoctorDashboard({ user, onLogout }) {
 
   return (
     <div className={`doctor-dashboard ${darkMode ? 'dark' : ''}`}>
-      <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
+      {/* Backdrop for mobile sidebar */}
+      <div
+        className={`sidebar-backdrop ${mobileOpen ? 'visible' : ''}`}
+        onClick={() => setMobileOpen(false)}
+        aria-hidden="true"
+      />
+
+      <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-brand">
           <div className="brand-mark"><Eye size={20} /></div>
           <div className="brand-copy">
@@ -191,7 +250,8 @@ export default function DoctorDashboard({ user, onLogout }) {
                 key={item.key}
                 className={`sidebar-item ${view === (item.key === 'dashboard' ? 'overview' : item.key) ? 'active' : ''}`}
                 type="button"
-                onClick={() => setView(item.key === 'dashboard' ? 'overview' : item.key)}
+                onClick={() => handleNavClick(item.key === 'dashboard' ? 'overview' : item.key)}
+                title={item.label}
               >
                 <Icon size={18} />
                 <span>{item.label}</span>
@@ -216,6 +276,16 @@ export default function DoctorDashboard({ user, onLogout }) {
 
       <div className="dashboard-main">
         <header className="topbar">
+          {/* Hamburger — visible only on mobile */}
+          <button
+            className="sidebar-mobile-btn"
+            type="button"
+            aria-label="Toggle sidebar"
+            onClick={() => setMobileOpen((o) => !o)}
+          >
+            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+
           <div className="search-field">
             <Search size={18} />
             <input
@@ -343,12 +413,19 @@ export default function DoctorDashboard({ user, onLogout }) {
                       <input type="datetime-local" className="glass-input" value={newSlot.start_time} onChange={e => setNewSlot({ ...newSlot, start_time: e.target.value })} required />
                       <label>Duration (minutes)</label>
                       <input type="number" className="glass-input" value={newSlot.duration_minutes} onChange={e => setNewSlot({ ...newSlot, duration_minutes: e.target.value })} />
+                      <label>Department</label>
+                      <select className="glass-input" value={newSlot.department} onChange={e => setNewSlot({ ...newSlot, department: e.target.value })} required>
+                        <option value="">Select department</option>
+                        {departments.map(department => (
+                          <option key={department.id} value={department.id}>{department.name}</option>
+                        ))}
+                      </select>
                       <label>Slot Type</label>
-                      <select className="glass-input" value={newSlot.slot_type} onChange={e => setNewSlot({ ...newSlot, slot_type: e.target.value })}>
-                        <option>Consultation</option>
-                        <option>Retinal Scan</option>
-                        <option>Follow-Up</option>
-                        <option>Procedure</option>
+                      <select className="glass-input" value={newSlot.slot_type} onChange={e => setNewSlot({ ...newSlot, slot_type: e.target.value })} required>
+                        <option value="">Select slot type</option>
+                        {slotTypes.map(slotType => (
+                          <option key={slotType.value} value={slotType.value}>{slotType.label}</option>
+                        ))}
                       </select>
                       <label>Capacity</label>
                       <input type="number" className="glass-input" value={newSlot.capacity} onChange={e => setNewSlot({ ...newSlot, capacity: e.target.value })} />
@@ -357,7 +434,7 @@ export default function DoctorDashboard({ user, onLogout }) {
                       </label>
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button type="submit" className="glass-btn">Create Slot</button>
-                        <button type="button" className="glass-btn glass-btn-secondary" onClick={() => setNewSlot({ start_time: '', duration_minutes: 30, slot_type: 'Consultation', capacity: 1, is_virtual: false })}>Reset</button>
+                        <button type="button" className="glass-btn glass-btn-secondary" onClick={() => setNewSlot(prev => ({ ...prev, start_time: '', duration_minutes: 30, capacity: 1, is_virtual: false }))}>Reset</button>
                       </div>
                     </form>
 
@@ -366,7 +443,7 @@ export default function DoctorDashboard({ user, onLogout }) {
                       {slots.length === 0 ? <p>No slots published.</p> : slots.map(s => (
                         <div key={s.id} style={{ border: '1px solid var(--glass-border)', borderRadius: 10, padding: 10, marginBottom: 8 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <strong>{s.slot_type} {s.is_virtual ? '• Virtual' : ''}</strong>
+                            <strong>{s.department_details?.name ? `${s.department_details.name} • ` : ''}{s.slot_type} {s.is_virtual ? '• Virtual' : ''}</strong>
                             <span style={{ fontSize: '0.9em', color: 'var(--text-muted)' }}>{new Date(s.start_time).toLocaleString()}</span>
                           </div>
                           <div style={{ marginTop: 6 }}>

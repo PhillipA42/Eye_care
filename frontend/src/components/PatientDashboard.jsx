@@ -10,12 +10,30 @@ import {
   AlertTriangle,
   FileText,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  LogOut,
+  ChevronLeft,
+  Search,
+  Bell,
+  Menu,
+  X
 } from 'lucide-react';
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat('en-KE', {
+    style: 'currency',
+    currency: 'KES',
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
+}
 
 export default function PatientDashboard({ user, onLogout, onOpenShop }) {
   const [activeSection, setActiveSection] = useState('triage');
   const [expandedMenu, setExpandedMenu] = useState('appointments');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+  const [search, setSearch] = useState('');
 
   // Triage state
   const [symptoms, setSymptoms] = useState({
@@ -60,6 +78,20 @@ export default function PatientDashboard({ user, onLogout, onOpenShop }) {
   });
   const [profileSuccess, setProfileSuccess] = useState('');
 
+  // Auto-collapse sidebar on small screens
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 900) {
+        setSidebarCollapsed(true);
+      } else {
+        setMobileOpen(false);
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     setProfileData({
       first_name: user.first_name || '',
@@ -78,10 +110,11 @@ export default function PatientDashboard({ user, onLogout, onOpenShop }) {
 
   const handleSectionSelect = (section) => {
     setActiveSection(section);
-
     if (section.startsWith('appointments')) {
       setExpandedMenu('appointments');
     }
+    // Close mobile sidebar on navigation
+    if (window.innerWidth <= 900) setMobileOpen(false);
   };
 
   const toggleMenu = (menu) => {
@@ -198,101 +231,165 @@ export default function PatientDashboard({ user, onLogout, onOpenShop }) {
   };
 
   return (
-    <div className="patient-dashboard-shell">
-      <aside className="patient-dashboard-sidebar">
-        <h2 style={{ marginTop: 0, marginBottom: '18px' }}>Patient Dashboard</h2>
+    <div className={`doctor-dashboard ${darkMode ? 'dark' : ''}`}>
+      {/* Backdrop for mobile sidebar */}
+      <div
+        className={`sidebar-backdrop ${mobileOpen ? 'visible' : ''}`}
+        onClick={() => setMobileOpen(false)}
+        aria-hidden="true"
+      />
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
+        <div className="sidebar-brand">
+          <div className="brand-mark"><Eye size={20} /></div>
+          <div className="brand-copy">
+            <strong>EyeCare</strong>
+            <span>Patient Portal</span>
+          </div>
+        </div>
+
+        <nav className="sidebar-nav">
           <button
-            className={`glass-btn ${activeSection === 'triage' ? '' : 'glass-btn-secondary'}`}
+            className={`sidebar-item ${activeSection === 'triage' ? 'active' : ''}`}
             onClick={() => handleSectionSelect('triage')}
           >
-            <ShieldCheck size={18} /> Symptom Triage
+            <ShieldCheck size={18} />
+            <span>Symptom Triage</span>
           </button>
 
           <button
-            className={`glass-btn ${activeSection === 'acuity' ? '' : 'glass-btn-secondary'}`}
+            className={`sidebar-item ${activeSection === 'acuity' ? 'active' : ''}`}
             onClick={() => handleSectionSelect('acuity')}
           >
-            <Eye size={18} /> Visual Acuity Test
+            <Eye size={18} />
+            <span>Visual Acuity Test</span>
           </button>
 
           <button
-            className={`glass-btn ${activeSection.startsWith('appointments') ? '' : 'glass-btn-secondary'}`}
+            className={`sidebar-item ${activeSection.startsWith('appointments') ? 'active' : ''}`}
             onClick={() => toggleMenu('appointments')}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Calendar size={18} /> Appointments
-            </span>
-            {expandedMenu === 'appointments' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            <Calendar size={18} />
+            <span>Appointments</span>
+            <div style={{marginLeft: 'auto'}}>
+              {expandedMenu === 'appointments' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            </div>
           </button>
 
           {expandedMenu === 'appointments' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '14px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '32px', marginTop: '-4px', marginBottom: '8px' }}>
               <button
-                className={`glass-btn ${activeSection === 'appointments-view' ? '' : 'glass-btn-secondary'}`}
+                className={`sidebar-item ${activeSection === 'appointments-view' ? 'active' : ''}`}
                 onClick={() => handleSectionSelect('appointments-view')}
+                style={{ padding: '8px 12px', fontSize: '0.9em' }}
               >
-                View Appointments
+                <span>View Appointments</span>
               </button>
               <button
-                className={`glass-btn ${activeSection === 'appointments-book' ? '' : 'glass-btn-secondary'}`}
+                className={`sidebar-item ${activeSection === 'appointments-book' ? 'active' : ''}`}
                 onClick={() => handleSectionSelect('appointments-book')}
+                style={{ padding: '8px 12px', fontSize: '0.9em' }}
               >
-                Book Appointment
+                <span>Book Appointment</span>
               </button>
             </div>
           )}
 
           <button
-            className={`glass-btn ${activeSection === 'prescriptions' ? '' : 'glass-btn-secondary'}`}
+            className={`sidebar-item ${activeSection === 'prescriptions' ? 'active' : ''}`}
             onClick={() => handleSectionSelect('prescriptions')}
           >
-            <FileText size={18} /> Prescriptions
+            <FileText size={18} />
+            <span>Prescriptions</span>
           </button>
 
           <button
-            className={`glass-btn ${activeSection === 'records' ? '' : 'glass-btn-secondary'}`}
+            className={`sidebar-item ${activeSection === 'records' ? 'active' : ''}`}
             onClick={() => handleSectionSelect('records')}
           >
-            <FileText size={18} /> Records
+            <FileText size={18} />
+            <span>Records</span>
           </button>
 
-          {/* SHOP BUTTON ONLY */}
           <button
-            className="glass-btn glass-btn-secondary"
+            className="sidebar-item"
             onClick={onOpenShop}
           >
-            <ShoppingCart size={18} /> Shop
+            <ShoppingCart size={18} />
+            <span>Shop</span>
           </button>
 
           <button
-            className={`glass-btn ${activeSection === 'invoices' ? '' : 'glass-btn-secondary'}`}
+            className={`sidebar-item ${activeSection === 'invoices' ? 'active' : ''}`}
             onClick={() => handleSectionSelect('invoices')}
           >
-            <DollarSign size={18} /> Billings
+            <DollarSign size={18} />
+            <span>Billings</span>
           </button>
 
           <button
-            className={`glass-btn ${activeSection === 'profile' ? '' : 'glass-btn-secondary'}`}
+            className={`sidebar-item ${activeSection === 'profile' ? 'active' : ''}`}
             onClick={() => handleSectionSelect('profile')}
           >
-            <User size={18} /> Profile
+            <User size={18} />
+            <span>Profile</span>
+          </button>
+        </nav>
+
+        <div className="sidebar-footer">
+          <button className="sidebar-toggle" type="button" onClick={() => setSidebarCollapsed((open) => !open)}>
+            {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          </button>
+          <button className="mode-toggle" type="button" onClick={() => setDarkMode((prev) => !prev)}>
+            <ShieldCheck size={16} />
+            <span>{darkMode ? 'Light' : 'Dark'}</span>
+          </button>
+          <button className="dashboard-logout-btn" type="button" onClick={onLogout}>
+            <LogOut size={16} /> Logout
           </button>
         </div>
-
-        <button
-          className="glass-btn glass-btn-secondary"
-          onClick={onLogout}
-          style={{ width: '100%', marginTop: '18px' }}
-        >
-          Logout
-        </button>
       </aside>
 
-      <main className="patient-dashboard-main">
-        <div className="tab-content" style={{ width: '100%', maxWidth: 'none' }}>
-          {activeSection === 'triage' && (
+      <div className="dashboard-main">
+        <header className="topbar">
+          {/* Hamburger — visible only on mobile */}
+          <button
+            className="sidebar-mobile-btn"
+            type="button"
+            aria-label="Toggle sidebar"
+            onClick={() => setMobileOpen((o) => !o)}
+          >
+            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+
+          <div className="search-field">
+            <Search size={18} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search..."
+              aria-label="Search"
+            />
+          </div>
+
+          <div className="topbar-actions">
+            <button className="icon-button" type="button" aria-label="Notifications">
+              <Bell size={20} />
+              <span className="icon-badge">0</span>
+            </button>
+            <button className="profile-pill" type="button">
+              <div className="profile-avatar">{(user?.first_name || user?.username || 'P')[0].toUpperCase()}</div>
+              <div>
+                <strong>{user?.first_name || ''} {user?.last_name || user?.username}</strong>
+                <small>Patient</small>
+              </div>
+            </button>
+          </div>
+        </header>
+
+        <main className="dashboard-content">
+          <div className="content-columns">
+            {activeSection === 'triage' && (
             <div className="grid-container">
               <div className="glass-card" style={{ padding: '24px' }}>
                 <h3>AI-Powered Symptom Pre-screening</h3>
@@ -463,7 +560,7 @@ export default function PatientDashboard({ user, onLogout, onOpenShop }) {
                 {appointments.length === 0 ? <p>You have no scheduled appointments.</p> : appointments.map(appt => (
                   <div key={appt.id} style={{ border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '12px', background: 'rgba(15, 23, 42, 0.45)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <strong>Type: {appt.slot_details?.slot_type || 'Consultation'}</strong>
+                      <strong>{appt.slot_details?.department_details?.name || 'Department not recorded'}: {appt.slot_details?.slot_type || 'Slot type not recorded'}</strong>
                       <span style={{ fontSize: '0.85em', color: appt.status === 'SCHEDULED' ? '#0ea5e9' : appt.status === 'COMPLETED' ? '#10b981' : '#f59e0b' }}>
                         {appt.status}
                       </span>
@@ -484,7 +581,7 @@ export default function PatientDashboard({ user, onLogout, onOpenShop }) {
                 {availableSlots.length === 0 ? <p>No slots currently available.</p> : availableSlots.map(slot => (
                   <div key={slot.id} style={{ border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(15, 23, 42, 0.45)' }}>
                     <div>
-                      <strong>{slot.slot_type}</strong>
+                      <strong>{slot.department_details?.name || 'Department not recorded'}: {slot.slot_type || 'Slot type not recorded'}</strong>
                       <div style={{ fontSize: '0.85em', color: 'var(--text-muted)', marginTop: '4px' }}>
                         Dr. {slot.doctor_details?.first_name || 'Clinician'} ({new Date(slot.start_time).toLocaleString()})
                       </div>
@@ -507,7 +604,7 @@ export default function PatientDashboard({ user, onLogout, onOpenShop }) {
 
           {bookingSlot && (
             <div className="glass-card" style={{ padding: '20px', marginTop: '18px' }}>
-              <h3>Booking: {bookingSlot.slot_type} — {new Date(bookingSlot.start_time).toLocaleString()}</h3>
+              <h3>Booking: {bookingSlot.department_details?.name || 'Department not recorded'} — {bookingSlot.slot_type || 'Slot type not recorded'} — {new Date(bookingSlot.start_time).toLocaleString()}</h3>
               <p>Please confirm your details to complete the booking.</p>
               <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
                 <input className="glass-input" placeholder="Full name" value={bookingForm.full_name} onChange={e => setBookingForm({ ...bookingForm, full_name: e.target.value })} />
@@ -578,7 +675,7 @@ export default function PatientDashboard({ user, onLogout, onOpenShop }) {
                     <div>
                       <strong>Invoice #{inv.id}</strong>
                       <div style={{ fontSize: '0.85em', color: 'var(--text-muted)', marginTop: '4px' }}>
-                        Issued: {new Date(inv.created_at).toLocaleDateString()} | Amount: ${inv.amount}
+                        Issued: {new Date(inv.created_at).toLocaleDateString()} | Amount: {formatCurrency(inv.amount)}
                       </div>
                     </div>
                     <span style={{ fontSize: '0.9em', fontWeight: 'bold', color: inv.status === 'PAID' ? 'var(--accent)' : 'var(--danger)' }}>
@@ -619,8 +716,9 @@ export default function PatientDashboard({ user, onLogout, onOpenShop }) {
               </form>
             </div>
           )}
-        </div>
-      </main>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

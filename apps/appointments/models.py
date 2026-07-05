@@ -14,6 +14,13 @@ class AppointmentSlot(models.Model):
         related_name='slots_created',
         limit_choices_to={'role__in': ['OPHTHALMOLOGIST', 'OPTOMETRIST']}
     )
+    department = models.ForeignKey(
+        'users.Department',
+        on_delete=models.PROTECT,
+        related_name='appointment_slots',
+        blank=True,
+        null=True
+    )
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     slot_type = models.CharField(max_length=30, choices=SlotType.choices, default=SlotType.TELECONSULTATION)
@@ -22,6 +29,7 @@ class AppointmentSlot(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=['doctor', 'start_time']),
+            models.Index(fields=['department']),
             models.Index(fields=['is_booked']),
             models.Index(fields=['slot_type']),
         ]

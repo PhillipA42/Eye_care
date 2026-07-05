@@ -2,6 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Trash2, Plus, Minus, Eye } from 'lucide-react';
 import { api } from '../services/api';
 
+function formatCurrency(value) {
+  return new Intl.NumberFormat('en-KE', {
+    style: 'currency',
+    currency: 'KES',
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
+}
+
 export default function Shop({ user, inline = false, initialTab = 'browse' }) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [products, setProducts] = useState([]);
@@ -70,7 +78,7 @@ export default function Shop({ user, inline = false, initialTab = 'browse' }) {
   };
 
   const calculateTotal = () => {
-    return cart.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0).toFixed(2);
+    return cart.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
   };
 
   const handleCheckout = async (e) => {
@@ -157,7 +165,7 @@ export default function Shop({ user, inline = false, initialTab = 'browse' }) {
                   <h5 style={{ marginTop: 0 }}>{product.name}</h5>
                   <p style={{ color: 'var(--text-muted)', margin: '8px 0' }}>{product.description}</p>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '12px 0' }}>
-                    <span style={{ fontWeight: 'bold', fontSize: '1.1em' }}>${product.unit_price}</span>
+                    <span style={{ fontWeight: 'bold', fontSize: '1.1em' }}>{formatCurrency(product.unit_price)}</span>
                     <span style={{ fontSize: '0.85em', color: 'var(--text-muted)' }}>{product.item_type}</span>
                   </div>
                   {product.is_prescription_required && (
@@ -190,7 +198,7 @@ export default function Shop({ user, inline = false, initialTab = 'browse' }) {
                   <div key={item.product_id} style={{ border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
                     <div>
                       <strong>{item.product_name}</strong>
-                      <p style={{ margin: '4px 0', color: 'var(--text-muted)', fontSize: '0.9em' }}>${item.unit_price} each</p>
+                      <p style={{ margin: '4px 0', color: 'var(--text-muted)', fontSize: '0.9em' }}>{formatCurrency(item.unit_price)} each</p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <button className="glass-btn glass-btn-secondary" style={{ padding: '4px 8px' }} onClick={() => updateQuantity(item.product_id, item.quantity - 1)}><Minus size={14} /></button>
@@ -242,7 +250,7 @@ export default function Shop({ user, inline = false, initialTab = 'browse' }) {
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '8px', background: 'rgba(0,0,0,0.1)' }}>
                   <strong>Total:</strong>
-                  <span style={{ fontSize: '1.3em' }}>${calculateTotal()}</span>
+                  <span style={{ fontSize: '1.3em' }}>{formatCurrency(calculateTotal())}</span>
                 </div>
 
                 <button
@@ -279,7 +287,7 @@ export default function Shop({ user, inline = false, initialTab = 'browse' }) {
                     Ordered: {new Date(order.created_at).toLocaleDateString()}
                   </p>
                   <p style={{ margin: '4px 0', color: 'var(--text-muted)', fontSize: '0.85em' }}>
-                    Total: <strong>${order.total_amount}</strong>
+                    Total: <strong>{formatCurrency(order.total_amount)}</strong>
                   </p>
                   <p style={{ margin: '4px 0', fontSize: '0.85em' }}>
                     {order.is_pickup ? 'Pickup' : `Delivery: ${order.delivery_address}`}

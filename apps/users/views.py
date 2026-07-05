@@ -1,9 +1,18 @@
+from django.db.models import Q
 from rest_framework import generics, status, permissions
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
-from apps.users.models import User, PatientProfile
-from apps.users.serializers import UserRegistrationSerializer, UserSerializer, PatientProfileSerializer
+from apps.users.models import User, PatientProfile, Department, DirectMessage
+from apps.users.serializers import (
+    UserRegistrationSerializer,
+    UserSerializer,
+    PatientProfileSerializer,
+    DepartmentSerializer,
+    DirectMessageSerializer,
+    UserDirectorySerializer
+)
 
 class CustomObtainAuthToken(ObtainAuthToken):
     """
@@ -30,6 +39,74 @@ class PatientRegistrationView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserRegistrationSerializer
     permission_classes = [permissions.AllowAny]
+
+
+class DepartmentListView(generics.ListAPIView):
+    """
+    Active hospital departments used across staff, appointments, and dashboards.
+    """
+    serializer_class = DepartmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Department.objects.filter(is_active=True)
+
+
+class UserDirectoryView(generics.ListAPIView):
+    """
+    Authenticated directory used by dashboards for in-system communication.
+    """
+    serializer_class = UserDirectorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return (
+            User.objects
+            .filter(is_active=True)
+            .exclude(id=self.request.user.id)
+            .select_related('staff_profile__department')
+            .order_by('role', 'first_name', 'last_name', 'username')
+        )
+
+
+class DirectMessageView(APIView):
+    """
+    Send messages and retrieve either a whole mailbox or one conversation.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        other_user_id = request.query_params.get('with_user')
+        messages = DirectMessage.objects.filter(
+            Q(sender=request.user) | Q(recipient=request.user)
+        ).select_related(
+            'sender', 'sender__staff_profile__department',
+            'recipient', 'recipient__staff_profile__department'
+        )
+
+        if other_user_id:
+            messages = messages.filter(
+                Q(sender=request.user, recipient_id=other_user_id) |
+                Q(sender_id=other_user_id, recipient=request.user)
+            ).order_by('created_at')
+
+            DirectMessage.objects.filter(
+                sender_id=other_user_id,
+                recipient=request.user,
+                is_read=False
+            ).update(is_read=True)
+        else:
+            messages = messages.order_by('-created_at')[:100]
+
+        serializer = DirectMessageSerializer(messages, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    def post(self, request, *args, **kwargs):
+        serializer = DirectMessageSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        message = serializer.save()
+        output = DirectMessageSerializer(message, context={'request': request})
+        return Response(output.data, status=status.HTTP_201_CREATED)
 
 
 class UserProfileView(generics.RetrieveUpdateAPIView):

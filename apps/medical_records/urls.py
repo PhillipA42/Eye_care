@@ -2,7 +2,8 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from apps.medical_records.views import (
     TriageViewSet, VisualAcuityTestViewSet, PrescriptionViewSet,
-    MedicalRecordViewSet, DiagnosticDeviceDataViewSet
+    MedicalRecordViewSet, DiagnosticDeviceDataViewSet,
+    OptometristDashboardSummaryView
 )
 
 app_name = 'medical_records'
@@ -15,5 +16,6 @@ router.register('records', MedicalRecordViewSet, basename='record')
 router.register('device-data', DiagnosticDeviceDataViewSet, basename='device-data')
 
 urlpatterns = [
+    path('optometrist-dashboard/summary/', OptometristDashboardSummaryView.as_view(), name='optometrist-dashboard-summary'),
     path('', include(router.urls)),
 ]

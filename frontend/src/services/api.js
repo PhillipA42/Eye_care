@@ -51,12 +51,15 @@ export const api = {
     method: 'PATCH',
     body: profileData
   }),
+  getDepartments: () => request('/users/departments/'),
 
   // Slots
   getSlots: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return request(`/appointments/slots/${query ? `?${query}` : ''}`);
   },
+
+  getSlotTypes: () => request('/appointments/slot-types/'),
   
   createSlot: (slotData) => request('/appointments/slots/', {
     method: 'POST',
@@ -99,6 +102,9 @@ export const api = {
     method: 'POST',
     body: testData
   }),
+
+  // Optometrist dashboard
+  getOptometristDashboardSummary: () => request('/medical-records/optometrist-dashboard/summary/'),
 
   // Prescriptions
   getPrescriptions: () => request('/medical-records/prescriptions/'),
@@ -154,6 +160,25 @@ export const api = {
     body: { payment_method_id: paymentMethodId }
   }),
 
+  updateInvoice: (id, invoiceData) => request(`/billing/invoices/${id}/`, {
+    method: 'PATCH',
+    body: invoiceData
+  }),
+
+  // Payments
+  getPayments: () => request('/billing/payments/'),
+  createPayment: (data) => request('/billing/payments/', {
+    method: 'POST',
+    body: data
+  }),
+
+  // Receipts
+  getReceipts: () => request('/billing/receipts/'),
+  createReceipt: (data) => request('/billing/receipts/', {
+    method: 'POST',
+    body: data
+  }),
+
   // Claims
   getClaims: () => request('/billing/claims/'),
   
@@ -178,6 +203,34 @@ export const api = {
     const query = new URLSearchParams(params).toString();
     return request(`/shop/inventory/${query ? `?${query}` : ''}`);
   },
+  
+  createShopProduct: (data) => request('/shop/products/', {
+    method: 'POST',
+    body: data
+  }),
+
+  updateShopProduct: (id, data) => request(`/shop/products/${id}/`, {
+    method: 'PATCH',
+    body: data
+  }),
+
+  deleteShopProduct: (id) => request(`/shop/products/${id}/`, {
+    method: 'DELETE'
+  }),
+
+  createShopInventory: (data) => request('/shop/inventory/', {
+    method: 'POST',
+    body: data
+  }),
+
+  updateShopInventory: (id, data) => request(`/shop/inventory/${id}/`, {
+    method: 'PATCH',
+    body: data
+  }),
+
+  deleteShopInventory: (id) => request(`/shop/inventory/${id}/`, {
+    method: 'DELETE'
+  }),
 
   // Shop: Orders (replaces billing orders)
   getOrders: () => request('/shop/orders/'),

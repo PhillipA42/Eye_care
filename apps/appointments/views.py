@@ -8,7 +8,7 @@ from apps.appointments.serializers import AppointmentSlotSerializer, Appointment
 from apps.users.permissions import IsPatient, IsStaffUser
 from apps.users.models import User
 
-class AppointmentSlotViewSet(viewsets.ReadOnlyModelViewSet):
+class AppointmentSlotViewSet(viewsets.ModelViewSet):
     """
     List available or booked appointment slots.
     Filtered by doctor, slot_type, and status.
@@ -24,14 +24,45 @@ class AppointmentSlotViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(is_booked=False, start_time__gt=timezone.now())
 
         doctor_id = self.request.query_params.get('doctor_id')
+        doctor = self.request.query_params.get('doctor')
+        department_id = self.request.query_params.get('department_id')
         slot_type = self.request.query_params.get('slot_type')
+        is_booked = self.request.query_params.get('is_booked')
         
-        if doctor_id:
-            queryset = queryset.filter(doctor_id=doctor_id)
+        if doctor_id or doctor:
+            queryset = queryset.filter(doctor_id=doctor_id or doctor)
+        if department_id:
+            queryset = queryset.filter(department_id=department_id)
         if slot_type:
             queryset = queryset.filter(slot_type=slot_type)
+        if is_booked in ['true', 'false', 'True', 'False', '1', '0']:
+            queryset = queryset.filter(is_booked=is_booked.lower() in ['true', '1'])
             
         return queryset.order_by('start_time')
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.role not in [User.Role.OPHTHALMOLOGIST, User.Role.OPTOMETRIST]:
+            raise permissions.exceptions.PermissionDenied("Only clinical staff can publish appointment slots.")
+
+        doctor = serializer.validated_data.get('doctor')
+        if doctor != user:
+            raise permissions.exceptions.PermissionDenied("Clinicians can only publish their own appointment slots.")
+
+        serializer.save()
+
+
+class AppointmentSlotTypeListView(views.APIView):
+    """
+    Appointment slot types exposed from the backend for frontend option lists.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        return Response([
+            {'value': value, 'label': label}
+            for value, label in AppointmentSlot.SlotType.choices
+        ])
 
 
 class AppointmentViewSet(viewsets.ModelViewSet):
@@ -112,4 +143,3 @@ class QueueEntryViewSet(viewsets.ModelViewSet):
     queryset = QueueEntry.objects.all()
     serializer_class = QueueEntrySerializer
     permission_classes = [IsStaffUser]
-

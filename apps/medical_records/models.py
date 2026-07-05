@@ -64,6 +64,22 @@ class Prescription(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     notes = models.TextField(blank=True, null=True, help_text="General instructions")
     
+    class DispenseStatus(models.TextChoices):
+        PENDING = 'PENDING', 'Pending Dispensation'
+        PARTIAL = 'PARTIAL', 'Partially Dispensed'
+        FULFILLED = 'FULFILLED', 'Fully Dispensed'
+        REJECTED = 'REJECTED', 'Rejected by Pharmacist'
+
+    dispense_status = models.CharField(max_length=20, choices=DispenseStatus.choices, default=DispenseStatus.PENDING)
+    dispensed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='dispensed_prescriptions', 
+        limit_choices_to={'role': 'PHARMACIST'}
+    )
+    
     # Digital Signature for verification/compliance
     is_signed = models.BooleanField(default=False)
     signature_hash = models.CharField(max_length=256, blank=True, null=True, help_text="SHA-256 hash representing doctor's digital signature")
@@ -99,6 +115,8 @@ class MedicationItem(models.Model):
     frequency = models.CharField(max_length=100, help_text="e.g. Twice daily, Once every 4 hours")
     duration_days = models.IntegerField(default=7)
     instructions = models.TextField(blank=True, null=True)
+    is_dispensed = models.BooleanField(default=False)
+    substitution_notes = models.TextField(blank=True, null=True, help_text="Pharmacist notes on substitutions or interactions")
 
 class MedicalRecord(models.Model):
     patient = models.ForeignKey(
@@ -158,3 +176,43 @@ class DiagnosticDeviceData(models.Model):
 
     def __str__(self):
         return f"{self.get_device_type_display()} for Record #{self.medical_record.id}"
+
+class DiagnosticTestRequest(models.Model):
+    class TestType(models.TextChoices):
+        OCT = 'OCT', 'Optical Coherence Tomography (OCT)'
+        VISUAL_FIELD = 'VISUAL_FIELD', 'Visual Field Test'
+        FUNDUS_PHOTO = 'FUNDUS_PHOTO', 'Fundus Photography'
+        LAB_TEST = 'LAB_TEST', 'Laboratory Test'
+
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        IN_PROGRESS = 'IN_PROGRESS', 'In Progress'
+        COMPLETED = 'COMPLETED', 'Completed'
+        CANCELLED = 'CANCELLED', 'Cancelled'
+
+    patient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='test_requests', limit_choices_to={'role': 'PATIENT'})
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='tests_requested', limit_choices_to={'role__in': ['OPHTHALMOLOGIST', 'OPTOMETRIST']})
+    medical_record = models.ForeignKey(MedicalRecord, on_delete=models.SET_NULL, null=True, blank=True, related_name='test_requests')
+    test_type = models.CharField(max_length=50, choices=TestType.choices)
+    clinical_notes = models.TextField(blank=True, null=True, help_text="Reason for test or specific instructions")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.get_test_type_display()} for {self.patient.username} ({self.status})"
+
+class SurgeryNote(models.Model):
+    medical_record = models.OneToOneField(MedicalRecord, on_delete=models.CASCADE, related_name='surgery_note')
+    surgeon = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='surgeries_performed', limit_choices_to={'role': 'OPHTHALMOLOGIST'})
+    procedure_name = models.CharField(max_length=200)
+    pre_op_diagnosis = models.TextField(blank=True, null=True)
+    post_op_diagnosis = models.TextField(blank=True, null=True)
+    operation_details = models.TextField()
+    complications = models.TextField(blank=True, null=True)
+    post_op_instructions = models.TextField(blank=True, null=True)
+    surgery_date = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Surgery: {self.procedure_name} for Record #{self.medical_record.id}"

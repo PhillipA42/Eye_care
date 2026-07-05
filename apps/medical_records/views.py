@@ -2,7 +2,9 @@ import hashlib
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from django.utils import timezone
+from apps.appointments.models import Appointment
 from apps.medical_records.models import (
     TriageEntry, VisualAcuityTest, Prescription, MedicalRecord, DiagnosticDeviceData
 )
@@ -12,6 +14,8 @@ from apps.medical_records.serializers import (
 )
 from apps.users.permissions import IsPatient, IsClinicalStaff, IsStaffUser, IsPharmacistOrOptician
 from apps.users.models import User
+
+NORMAL_SNELLEN_ACUITY = '20/20'
 
 class TriageViewSet(viewsets.ModelViewSet):
     """
@@ -160,3 +164,38 @@ class DiagnosticDeviceDataViewSet(viewsets.ModelViewSet):
     queryset = DiagnosticDeviceData.objects.all()
     serializer_class = DiagnosticDeviceDataSerializer
     permission_classes = [IsClinicalStaff]
+
+
+class OptometristDashboardSummaryView(APIView):
+    """
+    Database-backed summary values for the signed-in optometrist dashboard.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        if user.role != User.Role.OPTOMETRIST:
+            return Response(
+                {"detail": "Only optometrists can access this dashboard summary."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        today = timezone.localdate()
+        acuity_tests = VisualAcuityTest.objects.all()
+
+        return Response({
+            "today_appointments": Appointment.objects.filter(
+                doctor=user,
+                slot__start_time__date=today
+            ).count(),
+            "acuity_tests": acuity_tests.count(),
+            "abnormal_acuity": acuity_tests.exclude(
+                od_acuity=NORMAL_SNELLEN_ACUITY,
+                os_acuity=NORMAL_SNELLEN_ACUITY
+            ).count(),
+            "refractions_issued": Prescription.objects.filter(
+                doctor=user,
+                refraction_details__isnull=False
+            ).count(),
+            "clinical_records": MedicalRecord.objects.filter(doctor=user).count(),
+        })

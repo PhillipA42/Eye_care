@@ -8,6 +8,7 @@ class UsersAuthAPITests(APITestCase):
         self.register_url = reverse('users:patient_register')
         self.login_url = reverse('users:token_obtain')
         self.profile_url = reverse('users:profile_detail')
+        self.department_url = reverse('users:department-list')
         
         self.user_data = {
             'username': 'testpatient',
@@ -78,3 +79,33 @@ class UsersAuthAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['username'], 'testpatient')
         self.assertEqual(response.data['patient_profile']['insurance_provider'], 'Blue Shield')
+
+    def test_department_list_access(self):
+        """
+        Verify that active departments can be retrieved by authenticated users,
+        and unauthenticated requests are blocked.
+        """
+        # Unauthenticated request should be denied
+        response = self.client.get(self.department_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        # Register and Login to get a token
+        self.client.post(self.register_url, self.user_data, format='json')
+        login_credentials = {
+            'username': 'testpatient',
+            'password': 'securepassword123'
+        }
+        login_response = self.client.post(self.login_url, login_credentials, format='json')
+        token = login_response.data['token']
+        
+        # Authenticated request should succeed
+        self.client.credentials(HTTP_AUTHORIZATION='Token ' + token)
+        response = self.client.get(self.department_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Verify the seeded departments are returned
+        self.assertTrue(len(response.data) > 0)
+        # Check specific field keys
+        self.assertIn('code', response.data[0])
+        self.assertIn('name', response.data[0])
+        self.assertIn('is_clinical', response.data[0])
+

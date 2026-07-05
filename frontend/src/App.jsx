@@ -4,6 +4,9 @@ import PatientDashboard from './components/PatientDashboard';
 import DoctorDashboard from './components/DoctorDashboard';
 import ReceptionistDashboard from './components/ReceptionistDashboard';
 import PharmacistDashboard from './components/PharmacistDashboard';
+import OpticianDashboard from './components/OpticianDashboard';
+import OptometristDashboard from './components/OptometristDashboard';
+import CashierDashboard from './components/CashierDashboard';
 import Shop from './components/Shop';
 import heroImage from './assets/nurse.png';
 import { Eye, LogIn, UserPlus } from 'lucide-react';
@@ -114,7 +117,10 @@ function App() {
   const getStaffDashboardView = (role) => {
     if (role === 'RECEPTIONIST') return 'receptionist';
     if (role === 'PHARMACIST') return 'pharmacist';
-    if (['OPHTHALMOLOGIST', 'OPTOMETRIST'].includes(role)) return 'doctor';
+    if (role === 'OPTICIAN') return 'optician';
+    if (role === 'OPTOMETRIST') return 'optometrist';
+    if (role === 'OPHTHALMOLOGIST') return 'doctor';
+    if (role === 'CASHIER') return 'cashier';
     return null;
   };
 
@@ -341,6 +347,12 @@ function App() {
           <ReceptionistDashboard user={user} onLogout={handleLogout} />
         ) : staffDashboardView === 'pharmacist' ? (
           <PharmacistDashboard user={user} onLogout={handleLogout} />
+        ) : staffDashboardView === 'optician' ? (
+          <OpticianDashboard user={user} onLogout={handleLogout} />
+        ) : staffDashboardView === 'optometrist' ? (
+          <OptometristDashboard user={user} onLogout={handleLogout} />
+        ) : staffDashboardView === 'cashier' ? (
+          <CashierDashboard user={user} onLogout={handleLogout} />
         ) : (
           <div className="glass-card" style={{ padding: '24px' }}>
             <h3>Dashboard access for your account type is still under review.</h3>
